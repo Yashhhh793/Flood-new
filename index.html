@@ -1,8 +1,12 @@
 <div class="search-box">
-  <div class="search-title">Check any location</div>
+
+  <div class="search-title">
+    Check any location
+  </div>
 
   <!-- LOCATION SEARCH -->
   <div class="location-search-wrapper">
+
     <input
       id="location-input"
       type="text"
@@ -10,60 +14,136 @@
       autocomplete="off"
     />
 
-    <div id="location-suggestions" class="location-suggestions hidden"></div>
+    <div
+      id="location-suggestions"
+      class="location-suggestions hidden"
+    ></div>
+
   </div>
 
-  <!-- MAP SELECT BUTTON -->
+
+  <!-- MAP BUTTON -->
   <div class="location-actions">
-    <button id="map-select-btn" class="map-select-btn">
+
+    <button
+      id="map-select-btn"
+      class="map-select-btn"
+      type="button"
+    >
       📍 Select on Map
     </button>
 
-    <button id="clear-location-btn" class="clear-location-btn">
+    <button
+      id="clear-location-btn"
+      class="clear-location-btn"
+      type="button"
+    >
       Clear
     </button>
+
+  </div>
+  <!-- LOCATION SEARCH -->
+  <div class="location-search-wrapper">
+
+    <input
+      id="location-input"
+      type="text"
+      placeholder="Search state / city / location..."
+      autocomplete="off"
+    />
+
+    <div
+      id="location-suggestions"
+      class="location-suggestions hidden"
+    ></div>
+
   </div>
 
-  <!-- AUTO FILLED COORDINATES -->
+
+  <!-- MAP SELECT -->
+  <div class="location-actions">
+
+    <button
+      id="map-select-btn"
+      class="map-select-btn"
+      type="button"
+    >
+      📍 Select on Map
+    </button>
+
+    <button
+      id="clear-location-btn"
+      class="clear-location-btn"
+      type="button"
+    >
+      Clear
+    </button>
+
+  </div>
+
+  <!-- AUTOMATIC COORDINATES -->
   <div class="coordinates-row">
 
     <div>
-      <label>Latitude</label>
+
+      <label>
+        Latitude
+      </label>
+
       <input
         id="lat-input"
         type="text"
         placeholder="Auto"
         readonly
       />
+
     </div>
 
+
     <div>
-      <label>Longitude</label>
+
+      <label>
+        Longitude
+      </label>
+
       <input
         id="lon-input"
         type="text"
         placeholder="Auto"
         readonly
       />
+
     </div>
 
   </div>
 
+
   <!-- SELECTED LOCATION -->
-  <div id="selected-location-box" class="selected-location-box">
+  <div
+    id="selected-location-box"
+    class="selected-location-box"
+  >
     No location selected
   </div>
 
+
+  <!-- PREDICT -->
   <button
     id="check-btn"
     class="btn-secondary"
+    type="button"
     disabled
   >
     Predict Risk
   </button>
 
+
   <div class="location-help">
-    Type a state/location or click anywhere on the map.
-    Latitude and longitude will be filled automatically.
+
+    Type a state/location or click anywhere
+    on the map. Latitude and longitude will
+    be filled automatically.
+
   </div>
+
 </div>
