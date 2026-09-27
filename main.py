@@ -333,7 +333,7 @@ class PredictRequest(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 def root():
-    page = BASE / "web" / "index.html"
+    page = BASE / "index.html"   
     if not page.exists():
         return "<h1>FLASHGUARD API is running</h1>"
     return page.read_text(encoding="utf-8")
