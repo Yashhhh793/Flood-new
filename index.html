@@ -1,96 +1,66 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FLASHGUARD | Flood Early Warning</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FlashGuard | Hyper-Local Flash Flood Early Warning</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/web/style.css">
+<link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-<div class="app">
-  <aside class="sidebar">
-    <div class="brand"><div class="brandmark">FG</div><div><b>FLASHGUARD</b><span>HYPER-LOCAL FLOOD AI</span></div></div>
-    <div class="nav active">◉ Command Center</div>
-    <div class="nav">⌁ Risk Map</div>
-    <div class="nav">◌ Live Stations</div>
-    <div class="nav">⚠ Alerts</div>
-    <div class="nav">▣ Model Status</div>
-    <div class="side-card">
-      <small>SYSTEM STATUS</small>
-      <div class="status"><i></i> LIVE DATA PIPELINE</div>
-      <p id="lastData">Loading…</p>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">FG</div>
+    <div>
+      <div class="brand-title">FLASHGUARD</div>
+      <div class="brand-sub">Hyper-Local Flash Flood Prediction &amp; Early Warning</div>
     </div>
-    <div class="side-foot">SIH 2026 • Disaster Management<br>Uttarakhand telemetry</div>
+  </div>
+  <div class="topbar-right">
+    <span id="last-updated" class="muted">—</span>
+    <button id="refresh-btn" class="btn-primary">⟳ Refresh</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="summary-cards" id="summary-cards"></div>
+
+    <div class="search-box location-selector">
+      <div class="search-title">Select Location</div>
+      <div class="selector-hint">Search a place, choose a point on the map, or enter coordinates.</div>
+
+      <div class="place-search-row">
+        <input id="place-search" type="text" placeholder="Search city / village / landmark" autocomplete="off" />
+        <button id="search-place-btn" class="btn-small">Search</button>
+      </div>
+
+      <div class="map-hint">📍 <span>Click anywhere on the map to select a location</span></div>
+
+      <div class="search-row">
+        <input id="lat-input" type="number" step="any" placeholder="Latitude" />
+        <input id="lon-input" type="number" step="any" placeholder="Longitude" />
+      </div>
+      <input id="name-input" type="text" placeholder="Selected location name" />
+      <button id="check-btn" class="btn-secondary">Predict Risk</button>
+    </div>
+
+    <div class="location-list-title">Monitored Locations</div>
+    <div id="location-list" class="location-list"></div>
   </aside>
 
-  <main class="main">
-    <header class="topbar">
-      <div><div class="eyebrow">DISASTER MANAGEMENT / EARLY WARNING</div><h1>Flash Flood Command Center</h1></div>
-      <div class="top-actions"><span class="pill">● API ONLINE</span><button onclick="refreshAll()">Refresh</button></div>
-    </header>
-
-    <section class="hero">
-      <div>
-        <div class="hero-label">FLASHGUARD RISK ENGINE</div>
-        <h2>See rainfall pressure before it becomes a local emergency.</h2>
-        <p>Real Uttarakhand telemetry + rainfall anomaly ML + transparent risk signals.</p>
-      </div>
-      <div class="hero-badge"><strong id="overallLevel">SCANNING</strong><span>network signal</span></div>
-    </section>
-
-    <section class="cards">
-      <div class="metric"><span>MONITORED STATIONS</span><strong id="stations">—</strong><small>Uttarakhand telemetry</small></div>
-      <div class="metric"><span>CRITICAL</span><strong id="critical">—</strong><small>current risk signal</small></div>
-      <div class="metric"><span>HIGH</span><strong id="high">—</strong><small>current risk signal</small></div>
-      <div class="metric"><span>MODEL</span><strong id="modelState">—</strong><small>real-data ML status</small></div>
-    </section>
-
-    <section class="grid">
-      <div class="panel map-panel">
-        <div class="panel-head"><div><h3>Hyper-Local Risk Map</h3><span>Station-level live telemetry</span></div><span class="live-dot">LIVE</span></div>
-        <div id="map"></div>
-      </div>
-      <div class="panel station-panel">
-        <div class="panel-head"><div><h3>Station Intelligence</h3><span>Select a station</span></div></div>
-        <select id="stationSelect" onchange="loadStation()"></select>
-        <div class="station-title"><b id="stationName">—</b><span id="district">—</span></div>
-        <div class="risk-box"><div><span>RISK SIGNAL</span><strong id="riskLevel">—</strong></div><div class="score" id="riskScore">—</div></div>
-        <div class="rain-grid">
-          <div><span>1H</span><b id="r1">—</b><small>mm</small></div>
-          <div><span>3H</span><b id="r3">—</b><small>mm</small></div>
-          <div><span>6H</span><b id="r6">—</b><small>mm</small></div>
-          <div><span>24H</span><b id="r24">—</b><small>mm</small></div>
-          <div><span>72H</span><b id="r72">—</b><small>mm</small></div>
-        </div>
-        <div class="signal"><span>ML anomaly score</span><b id="ml">—</b></div>
-        <div class="signal"><span>Rainfall pressure</span><b id="pressure">—</b></div>
-        <div class="action"><span>RECOMMENDED ACTION</span><p id="action">—</p></div>
-      </div>
-    </section>
-
-    <section class="grid bottom">
-      <div class="panel">
-        <div class="panel-head"><div><h3>Early Warning Logic</h3><span>Transparent prototype decision layer</span></div></div>
-        <div class="steps">
-          <div><b>01</b><div><strong>Telemetry</strong><span>Hourly station rainfall</span></div></div>
-          <div><b>02</b><div><strong>Feature windows</strong><span>1h → 72h accumulated rainfall</span></div></div>
-          <div><b>03</b><div><strong>ML anomaly</strong><span>IsolationForest detects unusual rainfall patterns</span></div></div>
-          <div><b>04</b><div><strong>Risk signal</strong><span>Rainfall pressure + anomaly + optional terrain</span></div></div>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="panel-head"><div><h3>Model & Data Integrity</h3><span>Do not confuse risk signal with probability</span></div></div>
-        <div id="integrity" class="integrity">Loading…</div>
-      </div>
-    </section>
-
-    <footer>FLASHGUARD • Prototype for SIH 2026 • Model output is an early-warning research signal, not an official government alert.</footer>
+  <main class="map-wrap">
+    <div id="map"></div>
+    <div id="detail-panel" class="detail-panel hidden"></div>
   </main>
+
 </div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="/web/app.js"></script>
+<script src="/static/script.js"></script>
 </body>
 </html>
