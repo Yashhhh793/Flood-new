@@ -1,66 +1,69 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>FlashGuard | Hyper-Local Flash Flood Early Warning</title>
-<link rel="icon" href="data:,">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css" />
-</head>
-<body>
+<div class="search-box">
+  <div class="search-title">Check any location</div>
 
-<header class="topbar">
-  <div class="brand">
-    <div class="brand-mark">FG</div>
+  <!-- LOCATION SEARCH -->
+  <div class="location-search-wrapper">
+    <input
+      id="location-input"
+      type="text"
+      placeholder="Search state / city / location..."
+      autocomplete="off"
+    />
+
+    <div id="location-suggestions" class="location-suggestions hidden"></div>
+  </div>
+
+  <!-- MAP SELECT BUTTON -->
+  <div class="location-actions">
+    <button id="map-select-btn" class="map-select-btn">
+      📍 Select on Map
+    </button>
+
+    <button id="clear-location-btn" class="clear-location-btn">
+      Clear
+    </button>
+  </div>
+
+  <!-- AUTO FILLED COORDINATES -->
+  <div class="coordinates-row">
+
     <div>
-      <div class="brand-title">FLASHGUARD</div>
-      <div class="brand-sub">Hyper-Local Flash Flood Prediction &amp; Early Warning</div>
-    </div>
-  </div>
-  <div class="topbar-right">
-    <span id="last-updated" class="muted">—</span>
-    <button id="refresh-btn" class="btn-primary">⟳ Refresh</button>
-  </div>
-</header>
-
-<div class="layout">
-
-  <aside class="sidebar">
-    <div class="summary-cards" id="summary-cards"></div>
-
-    <div class="search-box location-selector">
-      <div class="search-title">Select Location</div>
-      <div class="selector-hint">Search a place, choose a point on the map, or enter coordinates.</div>
-
-      <div class="place-search-row">
-        <input id="place-search" type="text" placeholder="Search city / village / landmark" autocomplete="off" />
-        <button id="search-place-btn" class="btn-small">Search</button>
-      </div>
-
-      <div class="map-hint">📍 <span>Click anywhere on the map to select a location</span></div>
-
-      <div class="search-row">
-        <input id="lat-input" type="number" step="any" placeholder="Latitude" />
-        <input id="lon-input" type="number" step="any" placeholder="Longitude" />
-      </div>
-      <input id="name-input" type="text" placeholder="Selected location name" />
-      <button id="check-btn" class="btn-secondary">Predict Risk</button>
+      <label>Latitude</label>
+      <input
+        id="lat-input"
+        type="text"
+        placeholder="Auto"
+        readonly
+      />
     </div>
 
-    <div class="location-list-title">Monitored Locations</div>
-    <div id="location-list" class="location-list"></div>
-  </aside>
+    <div>
+      <label>Longitude</label>
+      <input
+        id="lon-input"
+        type="text"
+        placeholder="Auto"
+        readonly
+      />
+    </div>
 
-  <main class="map-wrap">
-    <div id="map"></div>
-    <div id="detail-panel" class="detail-panel hidden"></div>
-  </main>
+  </div>
 
+  <!-- SELECTED LOCATION -->
+  <div id="selected-location-box" class="selected-location-box">
+    No location selected
+  </div>
+
+  <button
+    id="check-btn"
+    class="btn-secondary"
+    disabled
+  >
+    Predict Risk
+  </button>
+
+  <div class="location-help">
+    Type a state/location or click anywhere on the map.
+    Latitude and longitude will be filled automatically.
+  </div>
 </div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="/static/script.js"></script>
-</body>
-</html>
