@@ -28,7 +28,7 @@ FEATURES = [
 
 app = FastAPI(
     title="FLASHGUARD — Hyper-Local Flash Flood Early Warning",
-    version="2.1",
+    version="2.2",
 )
 
 app.add_middleware(
@@ -39,16 +39,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-df = pd.DataFrame()
+# Keep startup memory small. Only the latest compact station table is retained.
 station_latest = pd.DataFrame()
 station_coords = pd.DataFrame()
 model = None
 meta = {}
 pcts = {}
+startup_error = None
 
 
 def _read_rainfall():
-    """Read only columns needed by the API and clean invalid values."""
+    """Read only columns needed by the API."""
     usecols = [
         "Data Acquisition Time",
         "Telemetry Hourly Rainfall (mm)",
@@ -58,7 +59,9 @@ def _read_rainfall():
         "Longitude",
     ]
 
-    # Read in one pass but only the six required columns.
+    if not DATA.exists():
+        raise FileNotFoundError(f"Rainfall data file not found: {DATA.name}")
+
     d = pd.read_csv(
         DATA,
         usecols=usecols,
@@ -83,9 +86,7 @@ def _read_rainfall():
 
     d["station_clean"] = d["Station"].astype(str).str.strip()
 
-    d = d.dropna(
-        subset=["timestamp", "station_clean"]
-    )
+    d = d.dropna(subset=["timestamp", "station_clean"])
 
     d = d.sort_values(
         ["station_clean", "timestamp"],
@@ -101,38 +102,27 @@ def _read_rainfall():
 
 
 def _window_sum(values, hours):
-    """Return the latest rolling rainfall total for a station."""
-    if len(values) == 0:
-        return np.nan
-
     vals = pd.to_numeric(
         pd.Series(values),
         errors="coerce",
-    )
-
-    vals = vals.dropna()
+    ).dropna()
 
     if vals.empty:
-        return np.nan
+        return 0.0
 
-    # Hourly telemetry: last N observations approximate N-hour rainfall.
     return float(vals.tail(hours).sum())
 
 
 def _build_latest(d):
-    """Create one compact row per station instead of storing all rolling rows."""
+    """Build one compact feature row per station."""
     latest_rows = []
 
-    for station, group in d.groupby(
-        "station_clean",
-        sort=False,
-    ):
+    for station, group in d.groupby("station_clean", sort=False):
         group = group.sort_values("timestamp")
+        last = group.iloc[-1]
         rain = group["rainfall_mm"]
 
-        last = group.iloc[-1]
-
-        row = {
+        latest_rows.append({
             "station_clean": station,
             "Station": last["Station"],
             "District": last["District"],
@@ -145,67 +135,77 @@ def _build_latest(d):
             "rainfall_12h_mm": _window_sum(rain, 12),
             "rainfall_24h_mm": _window_sum(rain, 24),
             "rainfall_72h_mm": _window_sum(rain, 72),
-        }
-
-        latest_rows.append(row)
+        })
 
     if not latest_rows:
-        return pd.DataFrame(
-            columns=[
-                "station_clean",
-                "Station",
-                "District",
-                "Latitude",
-                "Longitude",
-                "timestamp",
-                *FEATURES,
-            ]
-        )
+        return pd.DataFrame(columns=[
+            "station_clean", "Station", "District",
+            "Latitude", "Longitude", "timestamp", *FEATURES
+        ])
 
     return pd.DataFrame(latest_rows)
 
 
-def load_data():
-    global df, station_latest, station_coords
+def load_model_files():
     global model, meta, pcts
-
-    d = _read_rainfall()
-
-    # Keep the cleaned raw data for health/summary only.
-    df = d
-
-    # Only one compact feature row per station is needed by the dashboard.
-    station_latest = _build_latest(d)
-
-    station_coords = (
-        station_latest[
-            [
-                "station_clean",
-                "Station",
-                "District",
-                "Latitude",
-                "Longitude",
-            ]
-        ]
-        .drop_duplicates("station_clean")
-        .copy()
-    )
 
     if MODEL.exists():
         model = joblib.load(MODEL)
 
     if META.exists():
-        meta = json.loads(
-            META.read_text(encoding="utf-8")
-        )
+        meta = json.loads(META.read_text(encoding="utf-8"))
 
     if PCTS.exists():
-        pcts = json.loads(
-            PCTS.read_text(encoding="utf-8")
-        )
+        pcts = json.loads(PCTS.read_text(encoding="utf-8"))
 
 
-load_data()
+def load_station_data():
+    global station_latest, station_coords, startup_error
+
+    try:
+        d = _read_rainfall()
+        latest = _build_latest(d)
+
+        station_latest = latest
+
+        if not latest.empty:
+            station_coords = (
+                latest[
+                    [
+                        "station_clean",
+                        "Station",
+                        "District",
+                        "Latitude",
+                        "Longitude",
+                    ]
+                ]
+                .drop_duplicates("station_clean")
+                .copy()
+            )
+
+        startup_error = None
+        return True
+
+    except Exception as exc:
+        startup_error = str(exc)
+        station_latest = pd.DataFrame()
+        station_coords = pd.DataFrame()
+        return False
+
+
+# IMPORTANT:
+# Do not perform heavy model/data work while Python is importing the module.
+# FastAPI starts first, then startup initializes the small API state.
+@app.on_event("startup")
+def startup():
+    global startup_error
+
+    try:
+        load_model_files()
+    except Exception as exc:
+        startup_error = f"Model load error: {exc}"
+
+    load_station_data()
 
 
 def clamp(x, lo=0.0, hi=100.0):
@@ -231,28 +231,13 @@ def percentile_pressure(value, col):
         return 0.0
 
     if value <= p90:
-        return 35.0 * (
-            value - p75
-        ) / max(
-            p90 - p75,
-            1e-9,
-        )
+        return 35.0 * (value - p75) / max(p90 - p75, 1e-9)
 
     if value <= p95:
-        return 35.0 + 25.0 * (
-            value - p90
-        ) / max(
-            p95 - p90,
-            1e-9,
-        )
+        return 35.0 + 25.0 * (value - p90) / max(p95 - p90, 1e-9)
 
     if value <= p99:
-        return 60.0 + 25.0 * (
-            value - p95
-        ) / max(
-            p99 - p95,
-            1e-9,
-        )
+        return 60.0 + 25.0 * (value - p95) / max(p99 - p95, 1e-9)
 
     return 90.0
 
@@ -266,46 +251,23 @@ def anomaly_score(row):
         columns=FEATURES,
     )
 
-    decision = float(
-        model.decision_function(x)[0]
-    )
+    decision = float(model.decision_function(x)[0])
 
-    # More negative = more anomalous.
     raw = (
-        100.0
-        / (1.0 + math.exp(5.0 * decision))
+        100.0 / (1.0 + math.exp(5.0 * decision))
         - 50.0
     )
 
     return clamp(raw, 0, 100)
 
 
-def risk_from_features(
-    row,
-    slope=None,
-    elevation=None,
-):
+def risk_from_features(row, slope=None, elevation=None):
     pressures = [
-        percentile_pressure(
-            row.get("rainfall_1h_mm"),
-            "rainfall_1h_mm",
-        ),
-        percentile_pressure(
-            row.get("rainfall_3h_mm"),
-            "rainfall_3h_mm",
-        ),
-        percentile_pressure(
-            row.get("rainfall_6h_mm"),
-            "rainfall_6h_mm",
-        ),
-        percentile_pressure(
-            row.get("rainfall_24h_mm"),
-            "rainfall_24h_mm",
-        ),
-        percentile_pressure(
-            row.get("rainfall_72h_mm"),
-            "rainfall_72h_mm",
-        ),
+        percentile_pressure(row.get("rainfall_1h_mm"), "rainfall_1h_mm"),
+        percentile_pressure(row.get("rainfall_3h_mm"), "rainfall_3h_mm"),
+        percentile_pressure(row.get("rainfall_6h_mm"), "rainfall_6h_mm"),
+        percentile_pressure(row.get("rainfall_24h_mm"), "rainfall_24h_mm"),
+        percentile_pressure(row.get("rainfall_72h_mm"), "rainfall_72h_mm"),
     ]
 
     rain_pressure = (
@@ -321,18 +283,10 @@ def risk_from_features(
     terrain = 0.0
 
     if slope is not None:
-        terrain += clamp(
-            (float(slope) - 20)
-            / 50
-            * 100
-        )
+        terrain += clamp((float(slope) - 20) / 50 * 100)
 
     if elevation is not None:
-        terrain += clamp(
-            (float(elevation) - 500)
-            / 2500
-            * 100
-        )
+        terrain += clamp((float(elevation) - 500) / 2500 * 100)
 
     if slope is not None and elevation is not None:
         terrain /= 2
@@ -345,31 +299,19 @@ def risk_from_features(
 
     if score >= 78:
         level = "CRITICAL"
-        action = (
-            "Move to safer/high ground and "
-            "follow local authority instructions."
-        )
+        action = "Move to safer/high ground and follow local authority instructions."
         lead = "Immediate monitoring"
     elif score >= 58:
         level = "HIGH"
-        action = (
-            "Prepare evacuation route; avoid "
-            "streams, drains and low crossings."
-        )
+        action = "Prepare evacuation route; avoid streams, drains and low crossings."
         lead = "Near-term escalation possible"
     elif score >= 35:
         level = "MODERATE"
-        action = (
-            "Stay alert, check official alerts "
-            "and avoid unnecessary travel near channels."
-        )
+        action = "Stay alert, check official alerts and avoid unnecessary travel near channels."
         lead = "Watch conditions"
     else:
         level = "LOW"
-        action = (
-            "Continue monitoring rainfall and "
-            "official local advisories."
-        )
+        action = "Continue monitoring rainfall and official local advisories."
         lead = "No immediate model signal"
 
     return {
@@ -378,14 +320,8 @@ def risk_from_features(
         "action": action,
         "lead_time_window": lead,
         "ml_anomaly_score": round(ml, 1),
-        "rainfall_pressure": round(
-            rain_pressure,
-            1,
-        ),
-        "terrain_factor": round(
-            terrain,
-            1,
-        ),
+        "rainfall_pressure": round(rain_pressure, 1),
+        "terrain_factor": round(terrain, 1),
     }
 
 
@@ -397,9 +333,10 @@ class PredictRequest(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 def root():
-    return (
-        BASE / "web" / "index.html"
-    ).read_text(encoding="utf-8")
+    page = BASE / "web" / "index.html"
+    if not page.exists():
+        return "<h1>FLASHGUARD API is running</h1>"
+    return page.read_text(encoding="utf-8")
 
 
 @app.get("/api/health")
@@ -407,17 +344,16 @@ def health():
     return {
         "status": "ok",
         "model_loaded": model is not None,
-        "data_rows": int(len(df)),
-        "stations": int(
-            df["station_clean"].nunique()
-        ) if not df.empty else 0,
+        "data_loaded": not station_latest.empty,
+        "stations": int(len(station_latest)),
+        "startup_error": startup_error,
     }
 
 
 @app.get("/api/metrics")
 def metrics():
     return {
-        "status": "trained_real_data",
+        "status": "trained_real_data" if model is not None else "model_not_loaded",
         "model_type": meta.get("model_type"),
         "training_rows": meta.get("training_rows"),
         "stations": meta.get("stations"),
@@ -442,15 +378,14 @@ def stations():
     out = []
 
     for _, r in station_coords.iterrows():
-        latest = station_latest[
-            station_latest["station_clean"]
-            == r["station_clean"]
+        match = station_latest[
+            station_latest["station_clean"] == r["station_clean"]
         ]
 
-        if latest.empty:
+        if match.empty:
             continue
 
-        row = latest.iloc[0]
+        row = match.iloc[0]
         risk = risk_from_features(row)
 
         out.append({
@@ -458,21 +393,10 @@ def stations():
             "district": r["District"],
             "lat": float(r["Latitude"]),
             "lon": float(r["Longitude"]),
-            "timestamp": str(
-                row["timestamp"]
-            ),
-            "rainfall_1h": round(
-                float(row["rainfall_1h_mm"]),
-                2,
-            ),
-            "rainfall_3h": round(
-                float(row["rainfall_3h_mm"]),
-                2,
-            ),
-            "rainfall_24h": round(
-                float(row["rainfall_24h_mm"]),
-                2,
-            ),
+            "timestamp": str(row["timestamp"]),
+            "rainfall_1h": round(float(row["rainfall_1h_mm"]), 2),
+            "rainfall_3h": round(float(row["rainfall_3h_mm"]), 2),
+            "rainfall_24h": round(float(row["rainfall_24h_mm"]), 2),
             "risk_score": risk["risk_score"],
             "risk_level": risk["risk_level"],
         })
@@ -483,16 +407,12 @@ def stations():
 @app.get("/api/station/{station_name}")
 def station_detail(station_name: str):
     match = station_latest[
-        station_latest["station_clean"]
-        .str.lower()
+        station_latest["station_clean"].str.lower()
         == station_name.lower()
     ]
 
     if match.empty:
-        raise HTTPException(
-            404,
-            "Station not found",
-        )
+        raise HTTPException(status_code=404, detail="Station not found")
 
     r = match.iloc[0]
 
@@ -503,12 +423,7 @@ def station_detail(station_name: str):
         "lon": float(r["Longitude"]),
         "timestamp": str(r["timestamp"]),
         "rainfall": {
-            h: round(
-                float(
-                    r[f"rainfall_{h}h_mm"]
-                ),
-                2,
-            )
+            h: round(float(r[f"rainfall_{h}h_mm"]), 2)
             for h in [1, 3, 6, 12, 24, 72]
         },
         "risk": risk_from_features(r),
@@ -518,16 +433,12 @@ def station_detail(station_name: str):
 @app.post("/api/predict")
 def predict(req: PredictRequest):
     match = station_latest[
-        station_latest["station_clean"]
-        .str.lower()
+        station_latest["station_clean"].str.lower()
         == req.station.lower()
     ]
 
     if match.empty:
-        raise HTTPException(
-            404,
-            "Station not found",
-        )
+        raise HTTPException(status_code=404, detail="Station not found")
 
     r = match.iloc[0]
 
@@ -544,19 +455,12 @@ def predict(req: PredictRequest):
         "lat": float(r["Latitude"]),
         "lon": float(r["Longitude"]),
         "rainfall": {
-            h: round(
-                float(
-                    r[f"rainfall_{h}h_mm"]
-                ),
-                2,
-            )
+            h: round(float(r[f"rainfall_{h}h_mm"]), 2)
             for h in [1, 3, 6, 12, 24, 72]
         },
         "disclaimer": (
-            "ML anomaly score is trained on real "
-            "Uttarakhand telemetry rainfall. "
-            "Risk level is an engineering prototype "
-            "signal, not a certified flood probability."
+            "ML anomaly score is trained on real Uttarakhand telemetry rainfall. "
+            "Risk level is an engineering prototype signal, not a certified flood probability."
         ),
     })
 
@@ -566,58 +470,36 @@ def predict(req: PredictRequest):
 @app.get("/api/summary")
 def summary():
     if station_latest.empty:
-        return {}
+        return {
+            "stations": 0,
+            "critical": 0,
+            "high": 0,
+            "moderate": 0,
+            "low": 0,
+            "latest_data": None,
+        }
 
-    risks = []
+    levels = []
 
     for _, r in station_latest.iterrows():
-        risks.append(
-            risk_from_features(r)
-        )
+        levels.append(risk_from_features(r)["risk_level"])
 
-    levels = (
-        pd.Series(
-            [
-                x["risk_level"]
-                for x in risks
-            ]
-        )
-        .value_counts()
-        .to_dict()
-    )
+    counts = pd.Series(levels).value_counts().to_dict()
 
     return {
-        "stations": int(
-            len(station_latest)
-        ),
-        "critical": int(
-            levels.get("CRITICAL", 0)
-        ),
-        "high": int(
-            levels.get("HIGH", 0)
-        ),
-        "moderate": int(
-            levels.get("MODERATE", 0)
-        ),
-        "low": int(
-            levels.get("LOW", 0)
-        ),
-        "latest_data": str(
-            station_latest["timestamp"].max()
-        ),
+        "stations": int(len(station_latest)),
+        "critical": int(counts.get("CRITICAL", 0)),
+        "high": int(counts.get("HIGH", 0)),
+        "moderate": int(counts.get("MODERATE", 0)),
+        "low": int(counts.get("LOW", 0)),
+        "latest_data": str(station_latest["timestamp"].max()),
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=int(
-            os.environ.get(
-                "PORT",
-                8000,
-            )
-        ),
+        port=int(os.environ.get("PORT", 8000)),
     )
