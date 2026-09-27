@@ -202,3 +202,218 @@ html, body {
   margin-bottom: 9px;
 }
 .leaflet-container { font-family: 'Inter', sans-serif; }
+/* =========================================================
+   LOCATION SELECTOR
+   ========================================================= */
+
+.location-search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+#location-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 11px;
+  font-size: 13px;
+  outline: none;
+}
+
+#location-input:focus {
+  border-color: #3b82f6;
+}
+
+/* Suggestions dropdown */
+
+.location-suggestions {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+
+  max-height: 260px;
+  overflow-y: auto;
+
+  z-index: 5000;
+
+  box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+}
+
+.location-suggestions.hidden {
+  display: none;
+}
+
+.location-suggestion {
+  padding: 10px 12px;
+  cursor: pointer;
+
+  border-bottom: 1px solid var(--border);
+
+  font-size: 13px;
+}
+
+.location-suggestion:hover {
+  background: #1d2a45;
+}
+
+.location-suggestion:last-child {
+  border-bottom: none;
+}
+
+.location-suggestion-title {
+  font-weight: 600;
+}
+
+.location-suggestion-coords {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+
+/* Buttons */
+
+.location-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.map-select-btn {
+  flex: 1;
+
+  background: #20304d;
+  color: var(--text);
+
+  border: 1px solid var(--border);
+  border-radius: 8px;
+
+  padding: 9px;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.map-select-btn:hover {
+  background: #2a3d60;
+}
+
+.clear-location-btn {
+  background: transparent;
+  color: var(--muted);
+
+  border: 1px solid var(--border);
+  border-radius: 8px;
+
+  padding: 9px 13px;
+
+  font-size: 12px;
+
+  cursor: pointer;
+}
+
+.clear-location-btn:hover {
+  color: white;
+}
+
+
+/* Coordinates */
+
+.coordinates-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+
+  margin-top: 10px;
+}
+
+.coordinates-row label {
+  display: block;
+
+  color: var(--muted);
+
+  font-size: 10px;
+
+  margin-bottom: 4px;
+
+  text-transform: uppercase;
+}
+
+.coordinates-row input {
+  width: 100%;
+
+  background: #0d1626;
+
+  border: 1px solid var(--border);
+
+  color: #b9c7df;
+
+  border-radius: 7px;
+
+  padding: 9px;
+
+  font-size: 12px;
+}
+
+
+/* Selected location */
+
+.selected-location-box {
+  margin-top: 10px;
+
+  padding: 10px;
+
+  background: #0d1626;
+
+  border: 1px solid var(--border);
+
+  border-radius: 8px;
+
+  color: var(--muted);
+
+  font-size: 12px;
+
+  line-height: 1.4;
+}
+
+.selected-location-box strong {
+  color: white;
+}
+
+
+/* Help text */
+
+.location-help {
+  margin-top: 8px;
+
+  color: var(--muted);
+
+  font-size: 10.5px;
+
+  line-height: 1.4;
+}
+
+
+/* Selected marker */
+
+.custom-location-marker {
+  width: 18px;
+  height: 18px;
+
+  background: #3b82f6;
+
+  border: 3px solid white;
+
+  border-radius: 50%;
+
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
