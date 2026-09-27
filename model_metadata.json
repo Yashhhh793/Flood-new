@@ -1,0 +1,20 @@
+{
+  "model_type": "IsolationForest rainfall anomaly model",
+  "trained_on_real_data": true,
+  "training_rows": 30315,
+  "stations": 47,
+  "start": "2022-07-14 02:00:00",
+  "end": "2025-12-23 01:00:00",
+  "features": [
+    "rainfall_1h_mm",
+    "rainfall_3h_mm",
+    "rainfall_6h_mm",
+    "rainfall_12h_mm",
+    "rainfall_24h_mm",
+    "rainfall_72h_mm"
+  ],
+  "contamination": 0.05,
+  "historical_flash_flood_events_reference": 122,
+  "supervised_flood_labels_available_for_this_rainfall_period": false,
+  "important_note": "This model detects unusual rainfall patterns in the real telemetry data. It is not a validated supervised flood-probability model because the supplied 122 historical events are from 1970-2020 while this telemetry file is 2022-2025."
+}
